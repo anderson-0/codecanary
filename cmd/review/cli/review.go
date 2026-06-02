@@ -23,6 +23,7 @@ var reviewCmd = &cobra.Command{
 		replyOnly, _ := cmd.Flags().GetBool("reply-only")
 		claudePath, _ := cmd.Flags().GetString("claude-path")
 		baseBranch, _ := cmd.Flags().GetString("base")
+		council, _ := cmd.Flags().GetBool("council")
 
 		// GitHub mode — only when posting. Requires a PR (explicit or auto-detected).
 		if post {
@@ -45,15 +46,16 @@ var reviewCmd = &cobra.Command{
 				review.Stderrf(review.ColorYellow, "Warning: --base ignored in --post mode\n")
 			}
 			return review.Run(review.RunOptions{
-				Repo:       repo,
-				PRNumber:   prNumber,
-				ConfigPath: configPath,
-				Output:     output,
-				Post:       true,
-				DryRun:     dryRun,
-				ReplyOnly:  replyOnly,
-				ClaudePath: claudePath,
-				Version:    Version,
+				Repo:           repo,
+				PRNumber:       prNumber,
+				ConfigPath:     configPath,
+				Output:         output,
+				Post:           true,
+				DryRun:         dryRun,
+				ReplyOnly:      replyOnly,
+				ClaudePath:     claudePath,
+				Version:        Version,
+				CouncilEnabled: council,
 				Platform: &review.GithubPlatform{
 					Repo:     repo,
 					PRNumber: prNumber,
@@ -75,13 +77,14 @@ var reviewCmd = &cobra.Command{
 		review.Stderrf(review.ColorCyan, "Reviewing local changes on %s\n", pr.HeadBranch)
 
 		return review.Run(review.RunOptions{
-			PR:         pr,
-			ConfigPath: configPath,
-			Output:     output,
-			DryRun:     dryRun,
-			ReplyOnly:  replyOnly,
-			ClaudePath: claudePath,
-			Version:    Version,
+			PR:             pr,
+			ConfigPath:     configPath,
+			Output:         output,
+			DryRun:         dryRun,
+			ReplyOnly:      replyOnly,
+			ClaudePath:     claudePath,
+			Version:        Version,
+			CouncilEnabled: council,
 			Platform: &review.LocalPlatform{
 				Branch:       pr.HeadBranch,
 				OutputFormat: output,
@@ -98,6 +101,7 @@ func init() {
 	reviewCmd.Flags().Bool("reply-only", false, "Evaluate thread replies only, skip new findings (--post only)")
 	reviewCmd.Flags().String("claude-path", "", "Path to the Claude CLI binary (overrides config claude_path)")
 	reviewCmd.Flags().StringP("base", "b", "", "Base branch for local review (auto-detected if empty)")
+	reviewCmd.Flags().Bool("council", false, "Fan out to two reviewers in parallel and have a judge arbitrate the findings")
 	reviewCmd.PersistentFlags().Bool("dry-run", false, "Show prompt without running Claude")
 	rootCmd.AddCommand(reviewCmd)
 }
