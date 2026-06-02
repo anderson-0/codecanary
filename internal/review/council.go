@@ -9,15 +9,6 @@ import (
 	"sync"
 )
 
-// CouncilConfig holds the resolved provider/model settings for council mode.
-// Constructed by runner.go after loading ReviewConfig; nil means council is off.
-type CouncilConfig struct {
-	ReviewerProvider string
-	ReviewerModel    string
-	JudgeProvider    string
-	JudgeModel       string
-}
-
 // councilProvider implements ModelProvider by running two reviewers in parallel
 // and having a judge arbitrate their findings.
 type councilProvider struct {
