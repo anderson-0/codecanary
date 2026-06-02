@@ -655,6 +655,18 @@ func TestReviewConfigCouncilValidation(t *testing.T) {
 			t.Errorf("error should mention council_provider: %v", err)
 		}
 	})
+
+	t.Run("unknown council_judge_provider is invalid", func(t *testing.T) {
+		c := base()
+		c.CouncilJudgeProvider = "nonexistent-provider"
+		err := c.Validate()
+		if err == nil {
+			t.Fatal("expected error for unknown council_judge_provider")
+		}
+		if !strings.Contains(err.Error(), "council_judge_provider") {
+			t.Errorf("error should mention council_judge_provider: %v", err)
+		}
+	})
 }
 
 func TestParseRepoSlugURL(t *testing.T) {
