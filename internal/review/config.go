@@ -35,6 +35,11 @@ type ReviewConfig struct {
 	APIKeyEnv    string            `yaml:"api_key_env"`     // env var name for API key (default depends on provider)
 	ClaudeArgs   []string          `yaml:"claude_args"`     // extra args passed to the Claude CLI binary (claude provider only)
 	ClaudePath   string            `yaml:"claude_path"`     // path to Claude CLI binary (default: "claude")
+	// Council mode — opt-in via --council flag. All fields are optional.
+	CouncilProvider      string `yaml:"council_provider"`       // provider for 2nd reviewer
+	CouncilModel         string `yaml:"council_model"`          // model for 2nd reviewer
+	CouncilJudgeProvider string `yaml:"council_judge_provider"` // provider for judge (default: anthropic)
+	CouncilJudgeModel    string `yaml:"council_judge_model"`    // model for judge (default: claude-opus-4-8)
 	Evaluation   *EvaluationConfig `yaml:"evaluation"`
 }
 
@@ -234,6 +239,16 @@ func (c *ReviewConfig) Validate() error {
 		}
 	} else if len(c.ClaudeArgs) > 0 || c.ClaudePath != "" {
 		Stderrf(ansiYellow, "Warning: claude_args and claude_path are ignored for provider %q\n", c.Provider)
+	}
+	if c.CouncilProvider != "" {
+		if _, ok := providers[c.CouncilProvider]; !ok {
+			return fmt.Errorf("council_provider %q is not registered (valid: %s)", c.CouncilProvider, strings.Join(providerNames(), ", "))
+		}
+	}
+	if c.CouncilJudgeProvider != "" {
+		if _, ok := providers[c.CouncilJudgeProvider]; !ok {
+			return fmt.Errorf("council_judge_provider %q is not registered (valid: %s)", c.CouncilJudgeProvider, strings.Join(providerNames(), ", "))
+		}
 	}
 	for i, r := range c.Rules {
 		if r.Severity != "" && !validSeverities[r.Severity] {

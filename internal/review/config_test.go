@@ -627,6 +627,36 @@ func TestFilterRulesNoFilesReturnsAll(t *testing.T) {
 	}
 }
 
+func TestReviewConfigCouncilValidation(t *testing.T) {
+	base := func() *ReviewConfig {
+		return &ReviewConfig{
+			Version:     1,
+			Provider:    "anthropic",
+			ReviewModel: "claude-opus-4-8",
+			TriageModel: "claude-haiku-4-5",
+		}
+	}
+
+	t.Run("unset council fields are valid", func(t *testing.T) {
+		c := base()
+		if err := c.Validate(); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("unknown council_provider is invalid", func(t *testing.T) {
+		c := base()
+		c.CouncilProvider = "nonexistent-provider"
+		err := c.Validate()
+		if err == nil {
+			t.Fatal("expected error for unknown council_provider")
+		}
+		if !strings.Contains(err.Error(), "council_provider") {
+			t.Errorf("error should mention council_provider: %v", err)
+		}
+	})
+}
+
 func TestParseRepoSlugURL(t *testing.T) {
 	cases := []struct {
 		name    string
