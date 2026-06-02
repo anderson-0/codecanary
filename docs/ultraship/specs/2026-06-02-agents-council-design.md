@@ -78,11 +78,18 @@ council_judge_model: claude-opus-4-8
 2. `codex` is registered → use codex with its suggested review model
 3. Otherwise → use primary provider + `review_model` (two parallel calls to the same model — still useful for noise reduction)
 
+### CLI flags vs config fields
+
+`--council` is the **only** CLI flag added. The four provider/model fields (`council_provider`, `council_model`, `council_judge_provider`, `council_judge_model`) are config-file-only — there are no `--council-provider` etc. CLI flags. Users who want to override them must edit `config.yml`.
+
 ### Internal wiring
 
-`CouncilConfig` is a new struct stored on `RunOptions`:
+`CouncilConfig` is a new struct added to `RunOptions`:
 
 ```go
+// RunOptions (existing struct in runner.go) gains one field:
+Council *CouncilConfig // nil = council off
+
 type CouncilConfig struct {
     ReviewerProvider string
     ReviewerModel    string
@@ -92,6 +99,8 @@ type CouncilConfig struct {
 ```
 
 `opts.Council == nil` means council is off. `runner.go` checks this once when constructing the review provider.
+
+**CLI wiring in `review.go`:** When `--council` is set, the CLI reads the four council config fields from the already-loaded `ReviewConfig` (applying fallback defaults for any that are empty), constructs a `CouncilConfig`, and sets `opts.Council`. This happens after `prepareReview()` loads the config, before `Run()` is called — in both the GitHub and local code paths.
 
 ---
 
@@ -103,7 +112,7 @@ type CouncilConfig struct {
 Sources []string `json:"sources,omitempty"` // ["reviewer-1"], ["reviewer-2"], ["reviewer-1","reviewer-2"]
 ```
 
-Backward-compatible — existing findings without `sources` parse cleanly; `omitempty` means single-reviewer output is unchanged.
+Backward-compatible — existing findings without `sources` parse cleanly; `omitempty` means single-reviewer output is unchanged. The judge is instructed to include `"sources"` on **every** finding it emits, so council-mode output always has the field populated. `ParseFindingsSalvage()` is unaffected — `sources` is just another JSON field that unmarshals into the extended struct; missing it on a salvaged partial finding is acceptable (defaults to `nil`).
 
 ### Judge prompt (`BuildJudgePrompt`)
 
@@ -155,7 +164,8 @@ Each finding header gets a source tag: `[agreed]`, `[reviewer-1]`, or `[reviewer
 ### Judge fails
 
 - Fall back to reviewer-1's findings as final output.
-- Log: `"Council judge failed — using reviewer-1 output"`.
+- Before returning, retroactively set `Sources: []string{"reviewer-1"}` on every reviewer-1 finding so attribution is preserved in the output.
+- Log to stderr: `"Council judge failed — using reviewer-1 output"`.
 - Rationale: never leave the user with nothing.
 
 ### Incremental reviews (triage)
@@ -172,9 +182,11 @@ Each finding header gets a source tag: `[agreed]`, `[reviewer-1]`, or `[reviewer
 
 ### `--dry-run --council`
 
-- Prints the review prompt once (as today) plus:
-  `"[council mode: would fan out to <provider1> and <provider2>, judged by <judge>]"`
+- The review prompt is printed to stdout (as today).
+- Immediately after, a council summary is printed to **stderr**:
+  `"[council mode: would fan out to <provider1>/<model1> and <provider2>/<model2>, judged by <judge_provider>/<judge_model>]"`
 - No LLM calls are made.
+- The stderr message is printed in `runner.go` at the dry-run return point (after `fmt.Print(prompt)`, before `return nil`).
 
 ---
 
