@@ -14,17 +14,18 @@ import (
 
 // RunOptions configures a review run.
 type RunOptions struct {
-	Repo       string
-	PRNumber   int
-	ConfigPath string
-	Output     string // "markdown" or "json"
-	Post       bool
-	DryRun     bool
-	ReplyOnly  bool           // evaluate thread replies only, skip new findings
-	ClaudePath string         // override claude CLI binary path (overrides config claude_path)
-	Version    string         // binary version (for telemetry)
-	PR         *PRData        // pre-fetched PRData (used in local mode)
-	Platform   ReviewPlatform // environment adapter (GitHub or local)
+	Repo           string
+	PRNumber       int
+	ConfigPath     string
+	Output         string // "markdown" or "json"
+	Post           bool
+	DryRun         bool
+	ReplyOnly      bool           // evaluate thread replies only, skip new findings
+	ClaudePath     string         // override claude CLI binary path (overrides config claude_path)
+	Version        string         // binary version (for telemetry)
+	PR             *PRData        // pre-fetched PRData (used in local mode)
+	Platform       ReviewPlatform // environment adapter (GitHub or local)
+	CouncilEnabled bool           // when true, fan out to two reviewers + judge
 }
 
 // allowedEnvPrefixes lists environment variable prefixes passed to the LLM subprocess.
@@ -247,7 +248,9 @@ func formatResult(result *ReviewResult, format string) (string, error) {
 func trackUsage(tracker *UsageTracker, result *providerResult, phase string) {
 	if len(result.ModelUsages) > 0 {
 		for i := range result.ModelUsages {
-			result.ModelUsages[i].Phase = phase
+			if result.ModelUsages[i].Phase == "" {
+				result.ModelUsages[i].Phase = phase
+			}
 			result.ModelUsages[i].DurationMS = result.DurationMS
 			tracker.Add(result.ModelUsages[i])
 		}
@@ -348,7 +351,17 @@ func Run(opts RunOptions) error {
 		triageMC.ClaudeArgs = cfg.ClaudeArgs
 		triageMC.ClaudePath = claudePath
 	}
-	reviewProvider := NewProviderForRole(reviewMC, rctx.Env)
+	var reviewProvider ModelProvider
+	if opts.CouncilEnabled {
+		cp, err := newCouncilProvider(reviewMC, cfg, rctx.Env)
+		if err != nil {
+			return fmt.Errorf("council setup: %w", err)
+		}
+		reviewProvider = cp
+		Stderrf(ansiBold, "Council mode: %s vs %s, judge %s\n", cp.r1Label, cp.r2Label, cp.judgeLabel)
+	} else {
+		reviewProvider = NewProviderForRole(reviewMC, rctx.Env)
+	}
 	triageProvider := NewProviderForRole(triageMC, rctx.Env)
 	tracker := rctx.Tracker
 
@@ -390,6 +403,12 @@ func Run(opts RunOptions) error {
 	if opts.DryRun {
 		if prompt != "" {
 			fmt.Print(prompt)
+		}
+		if opts.CouncilEnabled {
+			if cp, ok := reviewProvider.(*councilProvider); ok {
+				fmt.Fprintf(os.Stderr, "[council mode: would fan out to %s and %s, judged by %s]\n",
+					cp.r1Label, cp.r2Label, cp.judgeLabel)
+			}
 		}
 		return nil
 	}
