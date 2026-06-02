@@ -131,3 +131,34 @@ func TestParseFindingsSalvageNoFence(t *testing.T) {
 		t.Fatal("expected error when no ```json fence present")
 	}
 }
+
+func TestParseFindingsWithSources(t *testing.T) {
+	output := "```json\n[\n  {\n    \"id\": \"test\",\n    \"file\": \"main.go\",\n    \"line\": 1,\n    \"severity\": \"warning\",\n    \"title\": \"Test\",\n    \"description\": \"Desc\",\n    \"fix_ref\": \"1-0\",\n    \"sources\": [\"reviewer-1\", \"reviewer-2\"]\n  }\n]\n```\n"
+
+	findings, err := ParseFindings(output)
+	if err != nil {
+		t.Fatalf("ParseFindings() error: %v", err)
+	}
+	if len(findings) != 1 {
+		t.Fatalf("expected 1 finding, got %d", len(findings))
+	}
+	if len(findings[0].Sources) != 2 {
+		t.Fatalf("expected 2 sources, got %v", findings[0].Sources)
+	}
+	if findings[0].Sources[0] != "reviewer-1" || findings[0].Sources[1] != "reviewer-2" {
+		t.Errorf("unexpected sources: %v", findings[0].Sources)
+	}
+}
+
+func TestParseFindingsSourcesOmitted(t *testing.T) {
+	// Findings without sources (single-reviewer mode) must still parse cleanly.
+	output := "```json\n[\n  {\n    \"id\": \"test\",\n    \"file\": \"main.go\",\n    \"line\": 1,\n    \"severity\": \"warning\",\n    \"title\": \"Test\",\n    \"description\": \"Desc\",\n    \"fix_ref\": \"1-0\"\n  }\n]\n```\n"
+
+	findings, err := ParseFindings(output)
+	if err != nil {
+		t.Fatalf("ParseFindings() error: %v", err)
+	}
+	if findings[0].Sources != nil {
+		t.Errorf("expected nil sources for non-council finding, got %v", findings[0].Sources)
+	}
+}

@@ -10,16 +10,17 @@ import (
 
 // Finding represents a single review issue found in the code.
 type Finding struct {
-	ID          string `json:"id"`
-	File        string `json:"file"`
-	Line        int    `json:"line"`
-	Severity    string `json:"severity"` // One of: critical, bug, warning, suggestion, nitpick
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	Suggestion  string `json:"suggestion,omitempty"`
-	FixRef      string `json:"fix_ref"`
-	Actionable  *bool  `json:"actionable,omitempty"`
-	Status      string `json:"status,omitempty"` // "new", "still open", or "" (first review)
+	ID          string   `json:"id"`
+	File        string   `json:"file"`
+	Line        int      `json:"line"`
+	Severity    string   `json:"severity"` // One of: critical, bug, warning, suggestion, nitpick
+	Title       string   `json:"title"`
+	Description string   `json:"description"`
+	Suggestion  string   `json:"suggestion,omitempty"`
+	FixRef      string   `json:"fix_ref"`
+	Actionable  *bool    `json:"actionable,omitempty"`
+	Status      string   `json:"status,omitempty"` // "new", "still open", or "" (first review)
+	Sources     []string `json:"sources,omitempty"`
 }
 
 // ReviewResult holds the complete output of a review run.
