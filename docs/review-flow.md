@@ -188,6 +188,58 @@ After the review is posted (or updated in place), `GithubPlatform.Publish` also 
 
 If telemetry is enabled (opt-in), fires an anonymous event with aggregate stats: provider, platform, finding counts by severity, token counts, cost, and duration. No code content is sent.
 
+## Council Mode (`--council`)
+
+Council mode fans the review prompt out to **two independent reviewers** in parallel, then runs a **judge** that arbitrates the findings — deduplicating overlapping issues, filtering noise, and attributing each surviving finding to its source(s).
+
+### Activation
+
+Pass `--council` to any `codecanary review` invocation. Works in both local and `--post` (GitHub) modes.
+
+### Three-provider flow
+
+```
+prompt
+  ├─► reviewer-1 (primary provider/model from config)
+  └─► reviewer-2 (council_provider/council_model, or codex fallback, or primary)
+        ↓ both complete (or one degrades gracefully)
+BuildJudgePrompt(r1 findings, r2 findings)
+        ↓
+judge (council_judge_provider/council_judge_model, default: anthropic/claude-opus-4-8)
+        ↓
+final findings with "sources" attribution
+```
+
+### Config
+
+All fields are optional. Add to `.codecanary/config.yml`:
+
+```yaml
+council_provider: codex           # 2nd reviewer provider (default: codex if registered, else primary)
+council_model: gpt-5.4-codex      # 2nd reviewer model
+council_judge_provider: anthropic # judge provider (default: anthropic)
+council_judge_model: claude-opus-4-8 # judge model
+```
+
+### Attribution
+
+The judge sets a `sources` field on every finding:
+- `["reviewer-1", "reviewer-2"]` → rendered as `[agreed]` — both reviewers raised this issue
+- `["reviewer-1"]` or `["reviewer-2"]` → rendered as `[reviewer-1]` / `[reviewer-2]` — solo finding kept by the judge
+
+### Degradation
+
+| Failure | Behaviour |
+|---|---|
+| Reviewer-1 fails | Judge runs with reviewer-2's findings only |
+| Reviewer-2 fails | Judge runs with reviewer-1's findings only |
+| Both fail | Error returned, no output |
+| Judge fails | Reviewer-1's findings returned with `sources: ["reviewer-1"]` on each |
+
+### Usage tracking
+
+All three calls appear in the usage table with phase labels `council-reviewer-1`, `council-reviewer-2`, and `council-judge`, and roll up to the normal totals.
+
 ## Key Design Decisions
 
 **Single pipeline, two platforms.** `Run()` never branches on "am I on GitHub?" The `ReviewPlatform` interface absorbs all environment differences. Adding a new platform (e.g. GitLab) means implementing the interface, not forking the pipeline.
