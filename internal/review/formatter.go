@@ -104,7 +104,11 @@ func FormatMarkdown(result *ReviewResult) string {
 	for _, f := range result.Findings {
 		b.WriteString("\n---\n\n")
 		icon := severityIcon(f.Severity)
-		fmt.Fprintf(&b, "### %s `%s` in `%s:%d`\n", icon, f.ID, f.File, f.Line)
+		srcTag := ""
+		if tag := sourceTag(f.Sources, false); tag != "" {
+			srcTag = " " + tag
+		}
+		fmt.Fprintf(&b, "### %s `%s` in `%s:%d`%s\n", icon, f.ID, f.File, f.Line, srcTag)
 		fmt.Fprintf(&b, "**%s**\n\n", f.Title)
 		fmt.Fprintf(&b, "%s\n", f.Description)
 
@@ -387,6 +391,18 @@ func statusTag(status string, colors bool) string {
 	}
 }
 
+// sourceTag returns an attribution label for council-mode findings.
+// Returns empty string when Sources is nil (single-reviewer mode).
+func sourceTag(sources []string, colors bool) string {
+	if len(sources) == 0 {
+		return ""
+	}
+	if len(sources) >= 2 {
+		return applyStyle(colors, ansiGreen, "[agreed]")
+	}
+	return applyStyle(colors, ansiCyan, "["+sources[0]+"]")
+}
+
 // writeTerminalFinding writes a single finding block with ANSI formatting.
 func writeTerminalFinding(b *strings.Builder, f *Finding, colors bool) {
 	b.WriteString("\n")
@@ -400,6 +416,9 @@ func writeTerminalFinding(b *strings.Builder, f *Finding, colors bool) {
 	findingID := applyStyle(colors, ansiCyan, f.ID)
 	header := fmt.Sprintf("  %s %s  %s", dot, sevLabel, findingID)
 	if tag := statusTag(f.Status, colors); tag != "" {
+		header += "  " + tag
+	}
+	if tag := sourceTag(f.Sources, colors); tag != "" {
 		header += "  " + tag
 	}
 	fmt.Fprintf(b, "%s\n", header)

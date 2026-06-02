@@ -97,6 +97,58 @@ func TestFormatReviewBody_NoFindings_NoFixAll(t *testing.T) {
 	}
 }
 
+func TestFormatTerminalSourcesAgreed(t *testing.T) {
+	result := &ReviewResult{
+		Findings: []Finding{
+			{ID: "f1", File: "a.go", Line: 1, Severity: "warning", Title: "T", Description: "D",
+				Sources: []string{"reviewer-1", "reviewer-2"}},
+		},
+	}
+	out := FormatTerminal(result)
+	if !strings.Contains(out, "[agreed]") {
+		t.Errorf("expected [agreed] tag for two-source finding, got:\n%s", out)
+	}
+}
+
+func TestFormatTerminalSourcesSolo(t *testing.T) {
+	result := &ReviewResult{
+		Findings: []Finding{
+			{ID: "f1", File: "a.go", Line: 1, Severity: "warning", Title: "T", Description: "D",
+				Sources: []string{"reviewer-2"}},
+		},
+	}
+	out := FormatTerminal(result)
+	if !strings.Contains(out, "[reviewer-2]") {
+		t.Errorf("expected [reviewer-2] tag for solo finding, got:\n%s", out)
+	}
+}
+
+func TestFormatTerminalSourcesAbsent(t *testing.T) {
+	result := &ReviewResult{
+		Findings: []Finding{
+			{ID: "f1", File: "a.go", Line: 1, Severity: "warning", Title: "T", Description: "D"},
+		},
+	}
+	out := FormatTerminal(result)
+	if strings.Contains(out, "[agreed]") || strings.Contains(out, "[reviewer-") {
+		t.Errorf("single-reviewer finding should have no attribution tag, got:\n%s", out)
+	}
+}
+
+func TestFormatMarkdownSources(t *testing.T) {
+	result := &ReviewResult{
+		PRNumber: 1,
+		Findings: []Finding{
+			{ID: "f1", File: "a.go", Line: 1, Severity: "bug", Title: "T", Description: "D",
+				Sources: []string{"reviewer-1", "reviewer-2"}},
+		},
+	}
+	out := FormatMarkdown(result)
+	if !strings.Contains(out, "[agreed]") {
+		t.Errorf("markdown should contain [agreed] tag, got:\n%s", out)
+	}
+}
+
 func TestCodeFence(t *testing.T) {
 	tests := []struct {
 		name    string
