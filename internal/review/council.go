@@ -30,12 +30,13 @@ type reviewerResult struct {
 // and the council fields in ReviewConfig. Applies fallback defaults.
 func newCouncilProvider(primaryMC *ModelConfig, cfg *ReviewConfig, env []string) (*councilProvider, error) {
 	r1MC := &ModelConfig{
-		Provider:   primaryMC.Provider,
-		Model:      primaryMC.Model,
-		APIBase:    primaryMC.APIBase,
-		APIKeyEnv:  primaryMC.APIKeyEnv,
-		ClaudeArgs: primaryMC.ClaudeArgs,
-		ClaudePath: primaryMC.ClaudePath,
+		Provider:     primaryMC.Provider,
+		Model:        primaryMC.Model,
+		AdvisorModel: primaryMC.AdvisorModel,
+		APIBase:      primaryMC.APIBase,
+		APIKeyEnv:    primaryMC.APIKeyEnv,
+		ClaudeArgs:   primaryMC.ClaudeArgs,
+		ClaudePath:   primaryMC.ClaudePath,
 	}
 	r1 := NewProviderForRole(r1MC, env)
 	r1Label := r1MC.Provider + "/" + r1MC.Model
@@ -43,7 +44,11 @@ func newCouncilProvider(primaryMC *ModelConfig, cfg *ReviewConfig, env []string)
 	var r2MC *ModelConfig
 	switch {
 	case cfg.CouncilProvider != "":
-		r2MC = &ModelConfig{Provider: cfg.CouncilProvider, Model: cfg.CouncilModel}
+		m := cfg.CouncilModel
+		if m == "" {
+			m = GetSuggestedReviewModel(cfg.CouncilProvider)
+		}
+		r2MC = &ModelConfig{Provider: cfg.CouncilProvider, Model: m}
 	case providerRegistered("codex"):
 		r2MC = &ModelConfig{Provider: "codex", Model: GetSuggestedReviewModel("codex")}
 	default:
@@ -61,11 +66,18 @@ func newCouncilProvider(primaryMC *ModelConfig, cfg *ReviewConfig, env []string)
 
 	judgeProvider := cfg.CouncilJudgeProvider
 	if judgeProvider == "" {
-		judgeProvider = "anthropic"
+		judgeProvider = primaryMC.Provider
 	}
 	judgeModel := cfg.CouncilJudgeModel
 	if judgeModel == "" {
-		judgeModel = "claude-opus-4-8"
+		switch judgeProvider {
+		case "claude":
+			judgeModel = "opus"
+		case "anthropic":
+			judgeModel = "claude-opus-4-8"
+		default:
+			judgeModel = GetSuggestedReviewModel(judgeProvider)
+		}
 	}
 	if _, ok := providers[judgeProvider]; !ok {
 		return nil, fmt.Errorf("council_judge_provider %q is not registered", judgeProvider)

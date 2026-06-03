@@ -38,8 +38,8 @@ type ReviewConfig struct {
 	// Council mode — opt-in via --council flag. All fields are optional.
 	CouncilProvider      string `yaml:"council_provider"`       // provider for 2nd reviewer
 	CouncilModel         string `yaml:"council_model"`          // model for 2nd reviewer
-	CouncilJudgeProvider string `yaml:"council_judge_provider"` // provider for judge (default: anthropic)
-	CouncilJudgeModel    string `yaml:"council_judge_model"`    // model for judge (default: claude-opus-4-8)
+	CouncilJudgeProvider string `yaml:"council_judge_provider"` // provider for judge (default: primary provider)
+	CouncilJudgeModel    string `yaml:"council_judge_model"`    // model for judge (default: opus-equivalent for the provider)
 	Evaluation   *EvaluationConfig `yaml:"evaluation"`
 }
 

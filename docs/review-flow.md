@@ -205,7 +205,7 @@ prompt
         ↓ both complete (or one degrades gracefully)
 BuildJudgePrompt(r1 findings, r2 findings)
         ↓
-judge (council_judge_provider/council_judge_model, default: anthropic/claude-opus-4-8)
+judge (council_judge_provider/council_judge_model, default: primary provider's opus-equivalent)
         ↓
 final findings with "sources" attribution
 ```
@@ -234,7 +234,7 @@ The judge sets a `sources` field on every finding:
 | Reviewer-1 fails | Judge runs with reviewer-2's findings only |
 | Reviewer-2 fails | Judge runs with reviewer-1's findings only |
 | Both fail | Error returned, no output |
-| Judge fails | Reviewer-1's findings returned with `sources: ["reviewer-1"]` on each |
+| Judge fails | Best available reviewer's findings returned (reviewer-1 preferred; reviewer-2 if reviewer-1 also failed), with `sources` set retroactively |
 
 ### Usage tracking
 
