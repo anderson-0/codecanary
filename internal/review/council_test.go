@@ -29,7 +29,7 @@ func TestBuildJudgePrompt(t *testing.T) {
 	r1 := []Finding{{ID: "f1", File: "a.go", Line: 1, Severity: "bug", Title: "T1", Description: "D1", FixRef: "1-0"}}
 	r2 := []Finding{{ID: "f2", File: "b.go", Line: 2, Severity: "warning", Title: "T2", Description: "D2", FixRef: "2-0"}}
 
-	prompt := BuildJudgePrompt(r1, r2)
+	prompt := buildJudgePrompt(r1, r2)
 
 	if !strings.Contains(prompt, "REVIEWER 1 FINDINGS") {
 		t.Error("prompt should contain REVIEWER 1 FINDINGS")
@@ -51,7 +51,7 @@ func TestBuildJudgePrompt(t *testing.T) {
 func TestBuildJudgePromptEmptyReviewer(t *testing.T) {
 	r1 := []Finding{}
 	r2 := []Finding{{ID: "f2", File: "b.go", Line: 1, Severity: "bug", Title: "T", Description: "D", FixRef: "1-0"}}
-	prompt := BuildJudgePrompt(r1, r2)
+	prompt := buildJudgePrompt(r1, r2)
 	if !strings.Contains(prompt, "REVIEWER 2 FINDINGS") {
 		t.Error("prompt should contain reviewer 2 findings section")
 	}
@@ -152,5 +152,34 @@ func TestCouncilProviderJudgeFails(t *testing.T) {
 	}
 	if len(findings[0].Sources) == 0 || findings[0].Sources[0] != "reviewer-1" {
 		t.Errorf("fallback should set Sources to reviewer-1, got %v", findings[0].Sources)
+	}
+}
+
+func TestCouncilProviderJudgeFailsReviewer1AlsoFailed(t *testing.T) {
+	// reviewer-1 failed, judge fails — should fall back to reviewer-2's findings
+	r2Findings := []Finding{
+		{ID: "f2", File: "b.go", Line: 1, Severity: "warning", Title: "T", Description: "D", FixRef: "1-0"},
+	}
+	r2Out := councilFindingsJSON(r2Findings)
+
+	cp := &councilProvider{
+		reviewer1: &mockProvider{err: errors.New("r1 failed")},
+		reviewer2: &mockProvider{text: r2Out},
+		judge:     &mockProvider{err: errors.New("judge failed")},
+	}
+
+	result, err := cp.Run(context.Background(), "prompt", RunOpts{})
+	if err != nil {
+		t.Fatalf("expected fallback to reviewer-2, got error: %v", err)
+	}
+	findings, err := ParseFindings(result.Text)
+	if err != nil {
+		t.Fatalf("could not parse fallback output: %v", err)
+	}
+	if len(findings) != 1 {
+		t.Fatalf("expected 1 finding from fallback, got %d", len(findings))
+	}
+	if len(findings[0].Sources) == 0 || findings[0].Sources[0] != "reviewer-2" {
+		t.Errorf("fallback should set Sources to reviewer-2, got %v", findings[0].Sources)
 	}
 }

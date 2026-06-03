@@ -147,12 +147,12 @@ func (p *councilProvider) Run(ctx context.Context, prompt string, opts RunOpts) 
 		modelUsages = append(modelUsages, u)
 	}
 
-	judgePrompt := BuildJudgePrompt(r1Findings, r2Findings)
+	judgePrompt := buildJudgePrompt(r1Findings, r2Findings)
 	judgeRes, judgeErr := p.judge.Run(ctx, judgePrompt, opts)
 
 	if judgeErr != nil {
-		fmt.Fprintf(os.Stderr, "Council: judge (%s) failed — falling back to reviewer-1 output: %v\n", p.judgeLabel, judgeErr)
-		return p.reviewer1Fallback(res1, r1Findings, modelUsages)
+		fmt.Fprintf(os.Stderr, "Council: judge (%s) failed — falling back to best available reviewer: %v\n", p.judgeLabel, judgeErr)
+		return p.reviewerFallback(res1, res2, r1Findings, r2Findings, modelUsages)
 	}
 
 	u := judgeRes.Usage
@@ -167,15 +167,25 @@ func (p *councilProvider) Run(ctx context.Context, prompt string, opts RunOpts) 
 	}, nil
 }
 
-// reviewer1Fallback returns reviewer-1's findings with Sources retroactively set.
-func (p *councilProvider) reviewer1Fallback(res1 reviewerResult, r1Findings []Finding, modelUsages []CallUsage) (*providerResult, error) {
-	if res1.err != nil {
-		return nil, fmt.Errorf("council: judge failed and reviewer-1 also failed")
+// reviewerFallback returns findings from the first available reviewer when the
+// judge fails, preferring reviewer-1. Sources are set retroactively.
+func (p *councilProvider) reviewerFallback(res1, res2 reviewerResult, r1Findings, r2Findings []Finding, modelUsages []CallUsage) (*providerResult, error) {
+	var findings []Finding
+	var label string
+	switch {
+	case res1.err == nil:
+		findings = r1Findings
+		label = "reviewer-1"
+	case res2.err == nil:
+		findings = r2Findings
+		label = "reviewer-2"
+	default:
+		return nil, fmt.Errorf("council: judge failed and both reviewers also failed")
 	}
-	for i := range r1Findings {
-		r1Findings[i].Sources = []string{"reviewer-1"}
+	for i := range findings {
+		findings[i].Sources = []string{label}
 	}
-	text, err := marshalFindingsAsOutput(r1Findings)
+	text, err := marshalFindingsAsOutput(findings)
 	if err != nil {
 		return nil, fmt.Errorf("council fallback: %w", err)
 	}
@@ -196,8 +206,8 @@ func marshalFindingsJSON(findings []Finding) ([]byte, error) {
 	return json.MarshalIndent(findings, "", "  ")
 }
 
-// BuildJudgePrompt constructs the arbitration prompt for the judge provider.
-func BuildJudgePrompt(r1Findings, r2Findings []Finding) string {
+// buildJudgePrompt constructs the arbitration prompt for the judge provider.
+func buildJudgePrompt(r1Findings, r2Findings []Finding) string {
 	r1JSON, _ := marshalFindingsJSON(r1Findings)
 	r2JSON, _ := marshalFindingsJSON(r2Findings)
 
