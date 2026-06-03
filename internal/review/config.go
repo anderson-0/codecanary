@@ -250,6 +250,24 @@ func (c *ReviewConfig) Validate() error {
 			return fmt.Errorf("council_judge_provider %q is not registered (valid: %s)", c.CouncilJudgeProvider, strings.Join(providerNames(), ", "))
 		}
 	}
+	// Validate council_model against the council provider's model validator (if set).
+	if c.CouncilProvider != "" && c.CouncilModel != "" {
+		if cpf, ok := providers[c.CouncilProvider]; ok && cpf.Validate != nil {
+			mc := &ModelConfig{Provider: c.CouncilProvider, Model: c.CouncilModel}
+			if err := cpf.Validate(mc); err != nil {
+				return fmt.Errorf("council_model: %w", err)
+			}
+		}
+	}
+	// Validate council_judge_model against the judge provider's model validator (if set).
+	if c.CouncilJudgeProvider != "" && c.CouncilJudgeModel != "" {
+		if jpf, ok := providers[c.CouncilJudgeProvider]; ok && jpf.Validate != nil {
+			mc := &ModelConfig{Provider: c.CouncilJudgeProvider, Model: c.CouncilJudgeModel}
+			if err := jpf.Validate(mc); err != nil {
+				return fmt.Errorf("council_judge_model: %w", err)
+			}
+		}
+	}
 	for i, r := range c.Rules {
 		if r.Severity != "" && !validSeverities[r.Severity] {
 			return fmt.Errorf("rule %d (%q): invalid severity %q", i, r.ID, r.Severity)

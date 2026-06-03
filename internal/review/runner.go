@@ -251,7 +251,9 @@ func trackUsage(tracker *UsageTracker, result *providerResult, phase string) {
 			if result.ModelUsages[i].Phase == "" {
 				result.ModelUsages[i].Phase = phase
 			}
-			result.ModelUsages[i].DurationMS = result.DurationMS
+			if result.ModelUsages[i].DurationMS == 0 {
+				result.ModelUsages[i].DurationMS = result.DurationMS
+			}
 			tracker.Add(result.ModelUsages[i])
 		}
 	} else {

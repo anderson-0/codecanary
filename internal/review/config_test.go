@@ -667,6 +667,19 @@ func TestReviewConfigCouncilValidation(t *testing.T) {
 			t.Errorf("error should mention council_judge_provider: %v", err)
 		}
 	})
+
+	t.Run("invalid council_model for claude provider is rejected", func(t *testing.T) {
+		c := base()
+		c.CouncilProvider = "claude"
+		c.CouncilModel = "not-a-real-model"
+		err := c.Validate()
+		if err == nil {
+			t.Fatal("expected error for invalid council_model")
+		}
+		if !strings.Contains(err.Error(), "council_model") {
+			t.Errorf("error should mention council_model: %v", err)
+		}
+	})
 }
 
 func TestParseRepoSlugURL(t *testing.T) {
